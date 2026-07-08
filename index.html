@@ -232,7 +232,10 @@
                 id: parseInt(row.no),
                 text: row.ans,
                 category: categoryMap[row.type] || 'none',
-                isFinal: index === arr.length - 1, // 最後の行を自動的に「最終問題」として扱う
+                // 今回提供されたCSVには最終問題が含まれていないため、一時的にfalseで固定
+                isFinal: false, 
+                // 将来的に最終問題を復活させる場合は以下のように戻す
+                // isFinal: index === arr.length - 1,
                 solved: false
             }));
         }
@@ -537,8 +540,8 @@
             const nameInput = document.getElementById('input-name').value.trim();
             if(!nameInput) return;
 
-            // 管理者パスワード "qY86orhWjlve0uE" の SHA-256ハッシュ値
-            const adminHash = "7b9e76100eb6de8584851ebef1b439fb04bb5255ee81c3c78096f9a0c8a67eb1";
+            // 管理者パスワードの SHA-256 ハッシュ値 (提供された値に更新)
+            const adminHash = "4722f487091666d009a631e6a3a7bedd026c365fbb4486c06091201b09b7ecc3";
             
             if (CryptoJS.SHA256(nameInput).toString() === adminHash) {
                 state.isAdmin = true;
