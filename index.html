@@ -58,6 +58,12 @@
             <span id="player-name-display" class="font-bold text-accent"></span>
         </div>
 
+        <!-- 中央上: 現在のターゲット表示 -->
+        <div id="current-target-display" class="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 px-6 py-3 rounded-full border border-accent/50 pointer-events-auto hidden flex items-center gap-3 shadow-lg">
+            <span class="text-accent font-bold text-sm">SEARCHING:</span>
+            <span id="target-text" class="font-bold text-lg"></span>
+        </div>
+
         <!-- 右上: 正解数 & Xシェア -->
         <div class="absolute top-4 right-4 flex gap-2 pointer-events-auto">
             <div class="bg-black/50 px-4 py-2 rounded-lg border border-accent/30 font-bold">
@@ -84,10 +90,10 @@
         <!-- 中央下: 正方形ツール -->
         <div class="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4 pointer-events-auto">
             <button onclick="toggleTool('frame')" id="btn-tool-frame" class="w-12 h-12 border-2 border-white bg-black/50 hover:bg-accent/30 transition rounded flex items-center justify-center tooltip relative">
-                <div class="w-6 h-6 border-2 border-white"></div>
+                <div class="w-6 h-6 border-2 border-black bg-white/80"></div>
             </button>
             <button onclick="toggleTool('solid')" id="btn-tool-solid" class="w-12 h-12 border-2 border-white bg-black/50 hover:bg-accent/30 transition rounded flex items-center justify-center">
-                <div class="w-6 h-6 bg-white"></div>
+                <div class="w-6 h-6 bg-black border border-gray-500"></div>
             </button>
         </div>
 
@@ -100,7 +106,7 @@
         </div>
         
         <!-- 中央: アラート用 -->
-        <div id="alert-msg" class="absolute top-1/4 left-1/2 -translate-x-1/2 bg-accent text-white px-6 py-3 rounded-full font-bold text-lg opacity-0 transition-opacity pointer-events-none"></div>
+        <div id="alert-msg" class="absolute top-1/4 left-1/2 -translate-x-1/2 bg-accent text-white px-6 py-3 rounded-full font-bold text-lg opacity-0 transition-opacity pointer-events-none shadow-lg z-50"></div>
 
         <!-- 管理者用ツールバー (隠し) -->
         <div id="admin-toolbar" class="hidden absolute top-16 left-4 bg-red-900/80 p-2 rounded border border-red-500 pointer-events-auto flex flex-col gap-2">
@@ -132,7 +138,7 @@
                 </button>
             </div>
             <div class="p-4 overflow-y-auto flex-1">
-                <ul id="riddle-list" class="space-y-3">
+                <ul id="riddle-list" class="space-y-2">
                     <!-- JSで生成 -->
                 </ul>
             </div>
@@ -306,10 +312,11 @@
             // リストが読み込めていない場合のみダミーリスト生成
             if (state.riddles.length === 0) {
                 state.riddles = [
-                    { id: 1, text: "夜空に輝くものは？(ツール不要)", category: "none", solved: false, isFinal: false },
-                    { id: 2, text: "青い四角の中にあるのは？(塗りつぶし使用)", category: "solid", solved: false, isFinal: false },
-                    { id: 3, text: "白い枠の中にあるのは？(枠のみ使用)", category: "frame", solved: false, isFinal: false },
-                    { id: 99, text: "【最終問題】全てを統合する言葉", category: "both", solved: false, isFinal: true }
+                    { id: 1, text: "夜空に輝くものは？", category: "none", solved: false, isFinal: false },
+                    { id: 2, text: "青い四角の中にあるのは？", category: "solid", solved: false, isFinal: false },
+                    { id: 3, text: "白い枠の中にあるのは？", category: "frame", solved: false, isFinal: false },
+                    { id: 4, text: "両方の四角を使うと？", category: "both", solved: false, isFinal: false },
+                    { id: 99, text: "【最終問題】全てを統合する言葉", category: "none", solved: false, isFinal: true }
                 ];
             }
 
@@ -319,7 +326,8 @@
                     1: { target: {x: 0.14, y: 0.21, w: 0.15, h: 0.1} },
                     2: { target: {x: 0.6, y: 0.13, w: 0.1, h: 0.1}, solid: {x: 0.6, y: 0.18, size: 0.1, rotIdx: 0} },
                     3: { target: {x: 0.4, y: 0.66, w: 0.1, h: 0.13}, frame: {x: 0.45, y: 0.73, size: 0.15, rotIdx: 0} },
-                    99: { target: {x: 0.0, y: 0.0, w: 1.0, h: 1.0}, frame: {x: 0.5, y:0.5, size: 0.5, rotIdx:0}, solid: {x: 0.5, y:0.5, size: 0.2, rotIdx:45} }
+                    4: { target: {x: 0.5, y: 0.5, w: 0.2, h: 0.2}, frame: {x: 0.5, y:0.5, size: 0.3, rotIdx:0}, solid: {x: 0.5, y:0.5, size: 0.15, rotIdx:45} },
+                    99: { target: {x: 0.0, y: 0.0, w: 1.0, h: 1.0} }
                 };
             }
         }
@@ -345,11 +353,13 @@
             if (!state.bgImg) return 0.2;
             const scaleW = canvas.width / state.imgBaseW;
             const scaleH = canvas.height / state.imgBaseH;
-            return Math.min(scaleW, scaleH) * 0.95; // 画面に収まるサイズ(95%で少し余白)
+            // 画面に収まるサイズの75%を下限とする
+            return Math.min(scaleW, scaleH) * 0.75; 
         }
 
         function getMaxZoom() {
-            return Math.max(20.0, getMinZoom() * 50); // 元の20倍、または全体表示の50倍まで拡大可能
+            // 最大ズームは1000% (10倍)
+            return 10.0;
         }
 
         function resizeCanvas() {
@@ -357,6 +367,7 @@
             canvas.height = window.innerHeight;
             if (state.bgImg) {
                 const minZ = getMinZoom();
+                // 現在のズームが最小値より小さければ最小値にリセット
                 if (state.camera.zoom < minZ) state.camera.zoom = minZ;
             }
             draw();
@@ -412,12 +423,14 @@
             ctx.rotate(angle);
 
             if (type === 'solid') {
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                // 塗りつぶし正方形の色を黒に変更
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
                 ctx.fillRect(-pixelSize/2, -pixelSize/2, pixelSize, pixelSize);
             } else {
-                ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 4;
+                // 枠のみ正方形を黒に変更
+                ctx.strokeStyle = '#000000'; ctx.lineWidth = 4;
                 ctx.strokeRect(-pixelSize/2, -pixelSize/2, pixelSize, pixelSize);
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.01)';
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.01)'; // 判定用にほぼ透明で塗る
                 ctx.fillRect(-pixelSize/2, -pixelSize/2, pixelSize, pixelSize);
             }
 
@@ -636,45 +649,96 @@
         function renderList() {
             const ul = document.getElementById('riddle-list');
             ul.innerHTML = '';
-            let total = 0;
+            
+            const groups = {
+                'none': { title: 'なし', items: [] },
+                'frame': { title: '🔲', items: [] },
+                'solid': { title: '⬛', items: [] },
+                'both': { title: '🔲⬛', items: [] }
+            };
+            let finalRiddle = null;
+            let totalNormal = 0;
+            let solvedNormal = 0;
 
+            // 謎をグループ分け
             state.riddles.forEach(r => {
-                // 全問解くまで最終問題はスキップ
-                if (r.isFinal && state.solvedCount < state.riddles.length - 1) return;
-                if (!r.isFinal) total++;
-
-                const li = document.createElement('li');
-                li.className = `flex justify-between items-center p-3 rounded bg-black/50 border ${r.solved ? 'border-gray-600 text-gray-500' : 'border-gray-700 text-white'}`;
-                
-                let icon = '';
-                if (r.category === 'frame') icon = '🔲';
-                if (r.category === 'solid') icon = '⬛';
-                if (r.category === 'both') icon = '🔲⬛';
-
-                let adminLabel = '';
-                if (state.isAdmin && state.ansData[r.id]) {
-                    adminLabel = '<span class="text-xs text-red-400 border border-red-400 px-1 rounded ml-2">保存済み</span>';
+                if (r.isFinal) {
+                    finalRiddle = r;
+                } else {
+                    groups[r.category].items.push(r);
+                    totalNormal++;
+                    if(r.solved) solvedNormal++;
                 }
-
-                li.innerHTML = `
-                    <div class="flex items-center gap-2">
-                        <span class="text-xs w-6 text-center">${icon}</span>
-                        <span>${r.text}</span>
-                        ${adminLabel}
-                    </div>
-                    <button onclick="setTarget(${r.id})" class="px-4 py-1 rounded font-bold text-sm transition ${r.solved ? 'bg-gray-700 cursor-not-allowed' : 'bg-accent hover:bg-accent/80 text-white'}" ${r.solved ? 'disabled' : ''}>
-                        探す
-                    </button>
-                `;
-                ul.appendChild(li);
             });
-            document.getElementById('total-display').innerText = total;
+
+            document.getElementById('total-display').innerText = totalNormal;
+            document.getElementById('score-display').innerText = solvedNormal;
+
+            // グループごとにリスト表示
+            const categoryOrder = ['none', 'frame', 'solid', 'both'];
+            categoryOrder.forEach(cat => {
+                const group = groups[cat];
+                if (group.items.length === 0) return;
+
+                // 見出し
+                const header = document.createElement('li');
+                header.className = "text-accent font-bold mt-4 mb-2 flex items-center gap-2 pb-1 border-b border-accent/30";
+                header.innerHTML = `<span class="text-xl">${group.title}</span>`;
+                ul.appendChild(header);
+
+                // アイテム
+                group.items.forEach(r => {
+                    ul.appendChild(createRiddleListItem(r));
+                });
+            });
+
+            // 最終問題の表示判定 (全問正解または管理者の場合)
+            if (finalRiddle && (solvedNormal === totalNormal || state.isAdmin)) {
+                const header = document.createElement('li');
+                header.className = "text-red-500 font-bold mt-6 mb-2 flex items-center gap-2 pb-1 border-b border-red-500/50 animate-pulse";
+                header.innerHTML = `<span>👑 最終問題</span>`;
+                ul.appendChild(header);
+                ul.appendChild(createRiddleListItem(finalRiddle));
+                if(solvedNormal === totalNormal && !finalRiddle.solved && !state.isAdmin) {
+                     showAlert('最終問題が出現しました！リストを確認してください。');
+                }
+            }
+        }
+
+        function createRiddleListItem(r) {
+            const li = document.createElement('li');
+            li.className = `flex justify-between items-center p-3 rounded bg-black/50 border ${r.solved ? 'border-gray-600 text-gray-500' : 'border-gray-700 text-white'}`;
+            
+            let adminLabel = '';
+            if (state.isAdmin && state.ansData[r.id]) {
+                adminLabel = '<span class="text-xs text-red-400 border border-red-400 px-1 rounded ml-2">保存済み</span>';
+            }
+
+            li.innerHTML = `
+                <div class="flex items-center gap-2 flex-1">
+                    <span class="font-bold mr-2">${r.id}.</span>
+                    <span class="truncate">${r.text}</span>
+                    ${adminLabel}
+                </div>
+                <button onclick="setTarget(${r.id})" class="whitespace-nowrap px-4 py-1 rounded font-bold text-sm transition ${r.solved ? 'bg-gray-700 cursor-not-allowed' : 'bg-accent hover:bg-accent/80 text-white'}" ${r.solved ? 'disabled' : ''}>
+                    探す
+                </button>
+            `;
+            return li;
         }
 
         function setTarget(id) {
             state.currentTargetId = id;
             state.framedRect = null;
+            const targetRiddle = state.riddles.find(r => r.id === id);
+
             closeModal('modal-list');
+            
+            // ターゲット表示を更新して表示
+            const targetDisplay = document.getElementById('current-target-display');
+            document.getElementById('target-text').innerText = `${targetRiddle.id}. ${targetRiddle.text}`;
+            targetDisplay.classList.remove('hidden');
+
             if (state.isAdmin) {
                 document.getElementById('btn-admin-save').classList.remove('hidden');
                 showAlert('管理者: 盤面を「囲む」で選択し、「設定を保存」を押してください');
@@ -738,14 +802,13 @@
                 state.currentTargetId = null;
                 state.framedRect = null;
                 document.getElementById('btn-judge').classList.add('hidden');
+                document.getElementById('current-target-display').classList.add('hidden'); // ターゲット表示を隠す
                 
                 showAlert('正解！');
                 updateUI();
                 
                 if (targetRiddle.isFinal) {
                     setTimeout(showClear, 1000);
-                } else if (state.solvedCount === state.riddles.length - 1) {
-                    showAlert('最終問題が出現しました！リストを確認してください。');
                 }
             } else {
                 playSE('inc');
@@ -756,7 +819,7 @@
         }
 
         function updateUI() {
-            document.getElementById('score-display').innerText = state.solvedCount;
+            // solvedCountの更新はrenderList内で行うようになったため削除
             renderList();
         }
 
@@ -776,7 +839,7 @@
 
         function shareTwitter(isClear = false) {
             let text = isClear 
-                ? `私は${state.solvedCount}全ての謎をみつけた！\n#一面謎いっぱい\n`
+                ? `私は全ての謎をみつけた！\n#一面謎いっぱい\n`
                 : `私は${state.solvedCount}の謎を見つけた！\n#一面謎いっぱい\n`;
             const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`;
             window.open(url, '_blank');
@@ -786,7 +849,7 @@
             const alertEl = document.getElementById('alert-msg');
             alertEl.innerText = msg;
             alertEl.classList.remove('opacity-0');
-            setTimeout(() => alertEl.classList.add('opacity-0'), 2000);
+            setTimeout(() => alertEl.classList.add('opacity-0'), 2500); // 表示時間を少し延長
         }
 
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
@@ -812,6 +875,7 @@
             
             showAlert(`問題ID: ${state.currentTargetId} のデータを一時保存しました`);
             document.getElementById('btn-admin-save').classList.add('hidden');
+            document.getElementById('current-target-display').classList.add('hidden'); // ターゲット表示を隠す
             state.currentTargetId = null;
             state.framedRect = null;
             updateUI(); // ←リストの「保存済み」ラベルを即座に更新
