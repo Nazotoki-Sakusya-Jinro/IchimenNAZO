@@ -164,6 +164,7 @@
             },
             rotations: [0, 30, 45, 60],
             pointer: { active: false, startX: 0, startY: 0, currentX: 0, currentY: 0, dragDist: 0 },
+            pinch: { active: false, initialDist: 0, initialZoom: 1, centerX: 0, centerY: 0 },
             dragTarget: null,
             hoverTarget: null
         };
@@ -381,7 +382,12 @@
         }
 
         // --- 操作イベント (省略せず実装) ---
-        function getPointerPos(e) { return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY }; }
+        function getPointerPos(e) { 
+            if (e.touches && e.touches.length > 0) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY }; 
+        }
 
         function checkToolHit(px, py, type) {
             const tool = state.tools[type];
@@ -404,6 +410,18 @@
 
         function onPointerDown(e) {
             if (e.target !== canvas) return;
+
+            if (e.touches && e.touches.length === 2) {
+                state.pinch.active = true;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                state.pinch.initialDist = Math.hypot(dx, dy);
+                state.pinch.initialZoom = state.camera.zoom;
+                state.pinch.centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                state.pinch.centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                return;
+            }
+
             const pos = getPointerPos(e);
             const imgPos = screenToImg(pos.x, pos.y);
             state.pointer.active = true; state.pointer.startX = pos.x; state.pointer.startY = pos.y;
@@ -418,6 +436,26 @@
         }
 
         function onPointerMove(e) {
+            if (e.touches && e.touches.length === 2 && state.pinch.active) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const currentDist = Math.hypot(dx, dy);
+                
+                if (state.pinch.initialDist > 0) {
+                    const zoomAmount = currentDist / state.pinch.initialDist;
+                    const newZoom = Math.max(0.2, Math.min(state.pinch.initialZoom * zoomAmount, 5.0));
+                    
+                    const imgPosBefore = screenToImg(state.pinch.centerX, state.pinch.centerY);
+                    state.camera.zoom = newZoom;
+                    const imgPosAfter = screenToImg(state.pinch.centerX, state.pinch.centerY);
+                    
+                    state.camera.x += (imgPosBefore.x - imgPosAfter.x);
+                    state.camera.y += (imgPosBefore.y - imgPosAfter.y);
+                }
+                draw();
+                return;
+            }
+
             const pos = getPointerPos(e);
             if (!state.pointer.active && e.type === 'mousemove') {
                 const hit = checkToolHit(pos.x, pos.y, 'solid') || checkToolHit(pos.x, pos.y, 'frame');
@@ -449,6 +487,16 @@
         }
 
         function onPointerUp(e) {
+            if (e.touches && e.touches.length < 2) {
+                state.pinch.active = false;
+            }
+            if (e.touches && e.touches.length === 1 && state.pointer.active) {
+                const pos = getPointerPos(e);
+                state.pointer.currentX = pos.x;
+                state.pointer.currentY = pos.y;
+                return;
+            }
+
             if (!state.pointer.active) return;
             if (state.dragTarget && state.dragTarget.includes('_scale') && state.pointer.dragDist < 20) {
                 const type = state.dragTarget.split('_')[0];
