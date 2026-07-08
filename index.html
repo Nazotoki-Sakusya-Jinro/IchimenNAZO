@@ -65,7 +65,11 @@
         </div>
 
         <!-- 右上: 正解数 & Xシェア -->
-        <div class="absolute top-4 right-4 flex gap-2 pointer-events-auto">
+        <div class="absolute top-4 right-4 flex gap-2 pointer-events-auto items-center">
+            <button id="btn-show-clear" onclick="openModal('modal-clear')" class="hidden bg-yellow-600/80 hover:bg-yellow-500 text-white font-bold px-3 py-2 rounded-lg border border-yellow-300 transition text-sm flex items-center gap-1 shadow-lg">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"></path></svg>
+                クリア画面へ
+            </button>
             <div class="bg-black/50 px-4 py-2 rounded-lg border border-accent/30 font-bold">
                 <span id="score-display" class="text-accent">0</span> / <span id="total-display">0</span>
             </div>
@@ -144,6 +148,30 @@
             </div>
         </div>
     </div>
+
+    <!-- モーダル: クリア画面 -->
+    <div id="modal-clear" class="modal hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-yellow-500 rounded-xl w-full max-w-2xl text-center shadow-[0_0_20px_rgba(234,179,8,0.5)] p-8 flex flex-col items-center">
+            <h1 class="text-4xl font-bold text-yellow-400 mb-6">GAME CLEAR!</h1>
+            <p class="mb-6 text-lg text-white">おめでとうございます！全ての謎を解き明かしました。</p>
+            
+            <img src="./data/nazo/clear.png" alt="Clear Image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" class="max-w-full max-h-[40vh] object-contain mb-6 rounded border border-gray-600">
+            <div class="hidden w-full h-40 bg-gray-800 border border-gray-600 rounded items-center justify-center mb-6 text-gray-500 flex-col">
+                <span class="font-bold">clear.png</span>
+                <span class="text-sm">ここに成功画像が表示されます</span>
+            </div>
+
+            <div class="flex gap-4 w-full justify-center mt-2">
+                <button onclick="shareTwitter(true)" class="flex-1 bg-[#1DA1F2] hover:bg-[#1a91da] text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 max-w-xs">
+                    <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                    Xにつぶやく
+                </button>
+                <button onclick="closeModal('modal-clear')" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-4 rounded-lg transition max-w-xs">
+                    画像へ戻る
+                </button>
+            </div>
+        </div>
+    </div>
     
     <!-- ローディング用 -->
     <div id="loading-screen" class="fixed inset-0 bg-black z-[60] flex items-center justify-center hidden">
@@ -157,6 +185,7 @@
         const state = {
             playerName: '',
             isAdmin: false,
+            isCleared: false,
             bgImg: null,
             imgBaseW: 2000,
             imgBaseH: 1500,
@@ -400,9 +429,22 @@
                 const rh = state.framedRect.h * state.imgBaseH * state.camera.zoom;
                 ctx.fillStyle = 'rgba(0, 174, 239, 0.2)'; ctx.fillRect(rt.x, rt.y, rw, rh);
                 ctx.strokeStyle = '#00aeef'; ctx.lineWidth = 2; ctx.strokeRect(rt.x, rt.y, rw, rh);
+
+                // 微調整用ハンドルの描画
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#00aeef';
+                ctx.lineWidth = 2;
+                const handles = [
+                    {x: rt.x, y: rt.y}, {x: rt.x + rw/2, y: rt.y}, {x: rt.x + rw, y: rt.y},
+                    {x: rt.x, y: rt.y + rh/2}, {x: rt.x + rw, y: rt.y + rh/2},
+                    {x: rt.x, y: rt.y + rh}, {x: rt.x + rw/2, y: rt.y + rh}, {x: rt.x + rw, y: rt.y + rh}
+                ];
+                handles.forEach(p => {
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                });
             }
 
-            if (state.dragTarget === 'framing' && state.pointer.active) {
+            if (state.dragTarget === 'framing_new' && state.pointer.active) {
                 const sStart = imgToScreen(state.pointer.startImgX, state.pointer.startImgY);
                 ctx.fillStyle = 'rgba(0, 174, 239, 0.3)';
                 ctx.fillRect(sStart.x, sStart.y, state.pointer.currentX - sStart.x, state.pointer.currentY - sStart.y);
@@ -471,6 +513,35 @@
             return null;
         }
 
+        function checkFramingHit(px, py) {
+            if (!state.framedRect) return null;
+            const rt = imgToScreen(state.framedRect.x, state.framedRect.y);
+            const rw = state.framedRect.w * state.imgBaseW * state.camera.zoom;
+            const rh = state.framedRect.h * state.imgBaseH * state.camera.zoom;
+            const handleRadius = 20;
+            
+            // 四隅
+            const corners = [
+                { id: 'framing_scale_nw', x: rt.x, y: rt.y },
+                { id: 'framing_scale_ne', x: rt.x + rw, y: rt.y },
+                { id: 'framing_scale_sw', x: rt.x, y: rt.y + rh },
+                { id: 'framing_scale_se', x: rt.x + rw, y: rt.y + rh }
+            ];
+            for (let c of corners) {
+                if (Math.hypot(px - c.x, py - c.y) < handleRadius) return c.id;
+            }
+            
+            // 辺
+            if (Math.abs(px - rt.x) < handleRadius && py >= rt.y && py <= rt.y + rh) return 'framing_scale_w';
+            if (Math.abs(px - (rt.x + rw)) < handleRadius && py >= rt.y && py <= rt.y + rh) return 'framing_scale_e';
+            if (Math.abs(py - rt.y) < handleRadius && px >= rt.x && px <= rt.x + rw) return 'framing_scale_n';
+            if (Math.abs(py - (rt.y + rh)) < handleRadius && px >= rt.x && px <= rt.x + rw) return 'framing_scale_s';
+            
+            // 移動 (内部)
+            if (px >= rt.x && px <= rt.x + rw && py >= rt.y && py <= rt.y + rh) return 'framing_move';
+            return null;
+        }
+
         function onPointerDown(e) {
             if (e.target !== canvas) return;
 
@@ -480,21 +551,21 @@
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 state.pinch.initialDist = Math.hypot(dx, dy);
                 state.pinch.initialZoom = state.camera.zoom;
-                state.pinch.centerX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-                state.pinch.centerY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-                return;
-            }
-
-            const pos = getPointerPos(e);
-            const imgPos = screenToImg(pos.x, pos.y);
-            state.pointer.active = true; state.pointer.startX = pos.x; state.pointer.startY = pos.y;
-            state.pointer.startImgX = imgPos.x; state.pointer.startImgY = imgPos.y;
+            state.pointer.startImgY = imgPos.y;
             state.pointer.currentX = pos.x; state.pointer.currentY = pos.y;
             state.pointer.dragDist = 0;
 
-            if (state.isFramingMode) { state.dragTarget = 'framing'; return; }
-            const hit = checkToolHit(pos.x, pos.y, 'solid') || checkToolHit(pos.x, pos.y, 'frame');
-            if (hit) { state.dragTarget = hit.target; return; }
+            const fHit = checkFramingHit(pos.x, pos.y);
+            const tHit = checkToolHit(pos.x, pos.y, 'solid') || checkToolHit(pos.x, pos.y, 'frame');
+
+            if (fHit) {
+                state.dragTarget = fHit;
+                toggleFramingMode(false); // 新規囲みモードを解除して微調整モードへ
+                return;
+            }
+
+            if (state.isFramingMode) { state.dragTarget = 'framing_new'; return; }
+            if (tHit) { state.dragTarget = tHit.target; return; }
             state.dragTarget = 'bg';
         }
 
@@ -523,9 +594,19 @@
 
             const pos = getPointerPos(e);
             if (!state.pointer.active && e.type === 'mousemove') {
-                const hit = checkToolHit(pos.x, pos.y, 'solid') || checkToolHit(pos.x, pos.y, 'frame');
-                state.hoverTarget = hit && hit.target.includes('scale') ? hit.target.split('_')[0] + '_handle_' + hit.handleIdx : null;
-                canvas.style.cursor = hit ? (hit.target.includes('scale') ? 'pointer' : 'move') : (state.isFramingMode ? 'crosshair' : 'default');
+                const fHit = checkFramingHit(pos.x, pos.y);
+                const tHit = checkToolHit(pos.x, pos.y, 'solid') || checkToolHit(pos.x, pos.y, 'frame');
+                state.hoverTarget = tHit && tHit.target.includes('scale') ? tHit.target.split('_')[0] + '_handle_' + tHit.handleIdx : null;
+                
+                if (fHit) {
+                    if (fHit.includes('nw') || fHit.includes('se')) canvas.style.cursor = 'nwse-resize';
+                    else if (fHit.includes('ne') || fHit.includes('sw')) canvas.style.cursor = 'nesw-resize';
+                    else if (fHit.includes('n') || fHit.includes('s')) canvas.style.cursor = 'ns-resize';
+                    else if (fHit.includes('e') || fHit.includes('w')) canvas.style.cursor = 'ew-resize';
+                    else canvas.style.cursor = 'move';
+                } else {
+                    canvas.style.cursor = tHit ? (tHit.target.includes('scale') ? 'pointer' : 'move') : (state.isFramingMode ? 'crosshair' : 'default');
+                }
                 draw();
             }
             if (!state.pointer.active) return;
@@ -547,6 +628,27 @@
                 const dist = Math.hypot(pos.x - center.x, pos.y - center.y);
                 let newPixelSize = Math.max(50, Math.min((dist * 2) / Math.SQRT2, 1000));
                 state.tools[type].size = newPixelSize / (state.imgBaseW * state.camera.zoom);
+            } else if (state.dragTarget.startsWith('framing_scale_')) {
+                const dir = state.dragTarget.split('_')[2];
+                const dxImg = dx / (state.imgBaseW * state.camera.zoom);
+                const dyImg = dy / (state.imgBaseH * state.camera.zoom);
+                
+                let {x, y, w, h} = state.framedRect;
+                if (dir.includes('n')) { y += dyImg; h -= dyImg; }
+                if (dir.includes('s')) { h += dyImg; }
+                if (dir.includes('w')) { x += dxImg; w -= dxImg; }
+                if (dir.includes('e')) { w += dxImg; }
+                
+                // サイズが負になった時の反転対応
+                if (w < 0) { x += w; w = Math.abs(w); state.dragTarget = state.dragTarget.replace('w', 'X').replace('e', 'w').replace('X', 'e'); }
+                if (h < 0) { y += h; h = Math.abs(h); state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); }
+                
+                state.framedRect = {x, y, w, h};
+            } else if (state.dragTarget === 'framing_move') {
+                const dxImg = dx / (state.imgBaseW * state.camera.zoom);
+                const dyImg = dy / (state.imgBaseH * state.camera.zoom);
+                state.framedRect.x += dxImg;
+                state.framedRect.y += dyImg;
             }
             draw();
         }
@@ -567,7 +669,7 @@
                 const type = state.dragTarget.split('_')[0];
                 state.tools[type].rotIdx = (state.tools[type].rotIdx + 1) % 4;
             }
-            if (state.dragTarget === 'framing') {
+            if (state.dragTarget === 'framing_new') {
                 const endImgPos = screenToImg(state.pointer.currentX, state.pointer.currentY);
                 const w = Math.abs(endImgPos.x - state.pointer.startImgX);
                 const h = Math.abs(endImgPos.y - state.pointer.startImgY);
@@ -660,6 +762,12 @@
             let totalNormal = 0;
             let solvedNormal = 0;
 
+            // 全体の問題数（進捗表示用）
+            const totalRiddles = state.riddles.length;
+            const solvedRiddles = state.riddles.filter(r => r.solved).length;
+            document.getElementById('total-display').innerText = totalRiddles;
+            document.getElementById('score-display').innerText = solvedRiddles;
+
             // 謎をグループ分け
             state.riddles.forEach(r => {
                 if (r.isFinal) {
@@ -671,8 +779,7 @@
                 }
             });
 
-            document.getElementById('total-display').innerText = totalNormal;
-            document.getElementById('score-display').innerText = solvedNormal;
+            // 進捗表示の更新削除（上で一括計算するため）
 
             // グループごとにリスト表示
             const categoryOrder = ['none', 'frame', 'solid', 'both'];
@@ -807,8 +914,12 @@
                 showAlert('正解！');
                 updateUI();
                 
-                if (targetRiddle.isFinal) {
+                // 全問正解チェック
+                const isAllCleared = state.riddles.every(r => r.solved);
+                if (isAllCleared && !state.isCleared) {
+                    state.isCleared = true;
                     setTimeout(showClear, 1000);
+                    document.getElementById('btn-show-clear').classList.remove('hidden');
                 }
             } else {
                 playSE('inc');
@@ -819,26 +930,15 @@
         }
 
         function updateUI() {
-            // solvedCountの更新はrenderList内で行うようになったため削除
             renderList();
         }
 
         function showClear() {
-            const div = document.createElement('div');
-            div.className = 'fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center text-center';
-            div.innerHTML = `
-                <h1 class="text-4xl font-bold text-accent mb-4">GAME CLEAR!</h1>
-                <p class="mb-8">おめでとうございます！全ての謎を解き明かしました。</p>
-                <button onclick="shareTwitter(true)" class="bg-[#1DA1F2] hover:bg-[#1a91da] text-white font-bold py-3 px-8 rounded-full transition flex items-center gap-2">
-                    <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                    Xにつぶやく
-                </button>
-            `;
-            document.body.appendChild(div);
+            openModal('modal-clear');
         }
 
-        function shareTwitter(isClear = false) {
-            let text = isClear 
+        function shareTwitter(fromClearModal = false) {
+            let text = state.isCleared 
                 ? `私は全ての謎をみつけた！\n#一面謎いっぱい\n`
                 : `私は${state.solvedCount}の謎を見つけた！\n#一面謎いっぱい\n`;
             const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`;
