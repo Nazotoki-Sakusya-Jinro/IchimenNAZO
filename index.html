@@ -136,18 +136,6 @@
         </div>
     </div>
     
-    <!-- モーダル: 管理者ログイン -->
-    <div id="modal-admin-login" class="modal hidden fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-        <div class="bg-gray-900 border border-red-500 p-8 rounded-xl max-w-sm w-full text-center">
-            <h2 class="text-xl font-bold mb-4 text-red-500">管理者モード</h2>
-            <input type="password" id="input-admin-pass" class="w-full bg-black border border-gray-600 rounded px-4 py-2 mb-4 text-white focus:outline-none focus:border-red-500" placeholder="パスワード">
-            <div class="flex gap-2">
-                <button onclick="closeModal('modal-admin-login'); openModal('modal-name');" class="flex-1 bg-gray-700 hover:bg-gray-600 font-bold py-2 px-4 rounded transition">戻る</button>
-                <button onclick="checkAdmin()" class="flex-1 bg-red-600 hover:bg-red-500 font-bold py-2 px-4 rounded transition">認証</button>
-            </div>
-        </div>
-    </div>
-
     <!-- ローディング用 -->
     <div id="loading-screen" class="fixed inset-0 bg-black z-[60] flex items-center justify-center hidden">
         <div class="text-accent text-xl font-bold animate-pulse">データを読み込み中...</div>
@@ -185,10 +173,10 @@
             document.getElementById('loading-screen').classList.remove('hidden');
 
             try {
-                // 1. 画像の読み込み
-                state.bgImg = await loadExternalImage('./data/nazo/nazo.png');
-                state.imgBaseW = state.bgImg.width;
-                state.imgBaseH = state.bgImg.height;
+                // 1. 画像の読み込み (svgを優先、失敗時はpng)
+                state.bgImg = await loadExternalImageFallback(['./data/nazo/nazo.svg', './data/nazo/nazo.png']);
+                state.imgBaseW = state.bgImg.width || 2000;
+                state.imgBaseH = state.bgImg.height || 1500;
 
                 // 2. 問題リストの読み込み (CSV)
                 const csvText = await fetchText('./data/nazo/list.csv');
@@ -209,12 +197,17 @@
             updateUI();
         }
 
-        function loadExternalImage(src) {
+        function loadExternalImageFallback(urls) {
             return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.onload = () => resolve(img);
-                img.onerror = () => reject(new Error('Image load failed'));
-                img.src = src;
+                let i = 0;
+                const tryNext = () => {
+                    if (i >= urls.length) return reject(new Error('All image loads failed'));
+                    const img = new Image();
+                    img.onload = () => resolve(img);
+                    img.onerror = () => { i++; tryNext(); };
+                    img.src = urls[i];
+                };
+                tryNext();
             });
         }
 
@@ -295,11 +288,15 @@
             };
         }
 
-        // --- 3. 音声再生 (エラー握りつぶし) ---
+        // --- 3. 音声再生 (エラー握りつぶし・WAV/MP3両対応) ---
         function playSE(type) {
             try {
                 const audio = new Audio(`./data/deco/${type}.wav`);
-                audio.play().catch(e => { /* ファイルがない場合は無視 */ });
+                audio.play().catch(e => {
+                    // wavがダメならmp3を試す
+                    const audioMp3 = new Audio(`./data/deco/${type}.mp3`);
+                    audioMp3.play().catch(err => { /* 両方ない場合は無視 */ });
+                });
             } catch(e) {}
         }
 
@@ -492,13 +489,18 @@
             const nameInput = document.getElementById('input-name').value.trim();
             if(!nameInput) return;
 
-            if (nameInput === '/admin') {
-                closeModal('modal-name');
-                openModal('modal-admin-login');
-                return;
+            // 管理者パスワード "qY86orhWjlve0uE" の SHA-256ハッシュ値
+            const adminHash = "7b9e76100eb6de8584851ebef1b439fb04bb5255ee81c3c78096f9a0c8a67eb1";
+            
+            if (CryptoJS.SHA256(nameInput).toString() === adminHash) {
+                state.isAdmin = true;
+                state.playerName = 'Admin';
+                document.getElementById('admin-toolbar').classList.remove('hidden');
+                showAlert('管理者モードでログインしました');
+            } else {
+                state.playerName = nameInput;
             }
 
-            state.playerName = nameInput;
             document.getElementById('player-name-display').innerText = state.playerName;
             
             closeModal('modal-name');
@@ -678,20 +680,6 @@
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
         // --- 6. 管理者機能 ---
-        function checkAdmin() {
-            const pass = document.getElementById('input-admin-pass').value;
-            // 本来はハッシュチェックですが、プロトタイプなので簡易ハードコード
-            if (pass === 'qY86orhWjlve0uE') {
-                state.isAdmin = true;
-                closeModal('modal-admin-login');
-                document.getElementById('input-name').value = 'Admin';
-                openModal('modal-name');
-                document.getElementById('admin-toolbar').classList.remove('hidden');
-            } else {
-                alert('パスワードが違います');
-            }
-        }
-
         function exportAdminData() {
             if (!state.currentTargetId || !state.framedRect) {
                 alert("リストから問題を選び、「囲む」で正解領域を指定してから押してください。\nツールが必要な問題はツールも配置してください。");
