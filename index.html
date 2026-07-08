@@ -628,22 +628,30 @@
                 let newPixelSize = Math.max(50, Math.min((dist * 2) / Math.SQRT2, 1000));
                 state.tools[type].size = newPixelSize / (state.imgBaseW * state.camera.zoom);
             } else if (state.dragTarget.startsWith('framing_scale_')) {
+                // 四隅のドラッグによるリサイズ処理を復活
                 const dir = state.dragTarget.split('_')[2];
                 const dxImg = dx / (state.imgBaseW * state.camera.zoom);
                 const dyImg = dy / (state.imgBaseH * state.camera.zoom);
                 
                 let {x, y, w, h} = state.framedRect;
+                
+                // ドラッグ方向に応じて座標とサイズを更新
                 if (dir.includes('n')) { y += dyImg; h -= dyImg; }
                 if (dir.includes('s')) { h += dyImg; }
                 if (dir.includes('w')) { x += dxImg; w -= dxImg; }
                 if (dir.includes('e')) { w += dxImg; }
                 
-                // サイズが負になった時の反転対応
-                if (w < 0) { x += w; w = Math.abs(w); state.dragTarget = state.dragTarget.replace('w', 'X').replace('e', 'w').replace('X', 'e'); }
-                if (h < 0) { y += h; h = Math.abs(h); state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); }
+                // サイズが負になった時の反転対応（ドラッグターゲットも反転させる）
+                if (w < 0) { 
+                    x += w; w = Math.abs(w); 
+                    state.dragTarget = state.dragTarget.replace('w', 'X').replace('e', 'w').replace('X', 'e'); 
+                }
+                if (h < 0) { 
+                    y += h; h = Math.abs(h); 
+                    state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); 
+                }
                 
                 state.framedRect = {x, y, w, h};
-            // framing_move の処理ブロックを削除
             }
             draw();
         }
