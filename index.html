@@ -430,17 +430,16 @@
                 ctx.fillStyle = 'rgba(0, 174, 239, 0.2)'; ctx.fillRect(rt.x, rt.y, rw, rh);
                 ctx.strokeStyle = '#00aeef'; ctx.lineWidth = 2; ctx.strokeRect(rt.x, rt.y, rw, rh);
 
-                // 微調整用ハンドルの描画
+                // 微調整用ハンドルの描画（四隅のみ）
                 ctx.fillStyle = '#ffffff';
                 ctx.strokeStyle = '#00aeef';
                 ctx.lineWidth = 2;
                 const handles = [
-                    {x: rt.x, y: rt.y}, {x: rt.x + rw/2, y: rt.y}, {x: rt.x + rw, y: rt.y},
-                    {x: rt.x, y: rt.y + rh/2}, {x: rt.x + rw, y: rt.y + rh/2},
-                    {x: rt.x, y: rt.y + rh}, {x: rt.x + rw/2, y: rt.y + rh}, {x: rt.x + rw, y: rt.y + rh}
+                    {x: rt.x, y: rt.y}, {x: rt.x + rw, y: rt.y},         // 左上、右上
+                    {x: rt.x, y: rt.y + rh}, {x: rt.x + rw, y: rt.y + rh} // 左下、右下
                 ];
                 handles.forEach(p => {
-                    ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 8, 0, Math.PI*2); ctx.fill(); ctx.stroke(); // サイズを少し大きく調整
                 });
             }
 
@@ -518,9 +517,9 @@
             const rt = imgToScreen(state.framedRect.x, state.framedRect.y);
             const rw = state.framedRect.w * state.imgBaseW * state.camera.zoom;
             const rh = state.framedRect.h * state.imgBaseH * state.camera.zoom;
-            const handleRadius = 20;
+            const handleRadius = 30; // 判定半径を大きくして押しやすくする
             
-            // 四隅
+            // 四隅のみ判定
             const corners = [
                 { id: 'framing_scale_nw', x: rt.x, y: rt.y },
                 { id: 'framing_scale_ne', x: rt.x + rw, y: rt.y },
@@ -531,14 +530,7 @@
                 if (Math.hypot(px - c.x, py - c.y) < handleRadius) return c.id;
             }
             
-            // 辺
-            if (Math.abs(px - rt.x) < handleRadius && py >= rt.y && py <= rt.y + rh) return 'framing_scale_w';
-            if (Math.abs(px - (rt.x + rw)) < handleRadius && py >= rt.y && py <= rt.y + rh) return 'framing_scale_e';
-            if (Math.abs(py - rt.y) < handleRadius && px >= rt.x && px <= rt.x + rw) return 'framing_scale_n';
-            if (Math.abs(py - (rt.y + rh)) < handleRadius && px >= rt.x && px <= rt.x + rw) return 'framing_scale_s';
-            
-            // 移動 (内部)
-            if (px >= rt.x && px <= rt.x + rw && py >= rt.y && py <= rt.y + rh) return 'framing_move';
+            // 辺と内部の判定は削除
             return null;
         }
 
@@ -608,11 +600,9 @@
                 state.hoverTarget = tHit && tHit.target.includes('scale') ? tHit.target.split('_')[0] + '_handle_' + tHit.handleIdx : null;
                 
                 if (fHit) {
+                    // 四隅のみ対応
                     if (fHit.includes('nw') || fHit.includes('se')) canvas.style.cursor = 'nwse-resize';
                     else if (fHit.includes('ne') || fHit.includes('sw')) canvas.style.cursor = 'nesw-resize';
-                    else if (fHit.includes('n') || fHit.includes('s')) canvas.style.cursor = 'ns-resize';
-                    else if (fHit.includes('e') || fHit.includes('w')) canvas.style.cursor = 'ew-resize';
-                    else canvas.style.cursor = 'move';
                 } else {
                     canvas.style.cursor = tHit ? (tHit.target.includes('scale') ? 'pointer' : 'move') : (state.isFramingMode ? 'crosshair' : 'default');
                 }
@@ -653,11 +643,7 @@
                 if (h < 0) { y += h; h = Math.abs(h); state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); }
                 
                 state.framedRect = {x, y, w, h};
-            } else if (state.dragTarget === 'framing_move') {
-                const dxImg = dx / (state.imgBaseW * state.camera.zoom);
-                const dyImg = dy / (state.imgBaseH * state.camera.zoom);
-                state.framedRect.x += dxImg;
-                state.framedRect.y += dyImg;
+            // framing_move の処理ブロックを削除
             }
             draw();
         }
