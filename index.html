@@ -215,6 +215,12 @@
 
             document.getElementById('loading-screen').classList.add('hidden');
             resizeCanvas();
+            
+            // 初回読み込み時にカメラを中央・全体表示にリセット
+            state.camera.x = 0.5;
+            state.camera.y = 0.5;
+            state.camera.zoom = getMinZoom();
+            
             updateUI();
         }
 
@@ -335,9 +341,24 @@
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
 
+        function getMinZoom() {
+            if (!state.bgImg) return 0.2;
+            const scaleW = canvas.width / state.imgBaseW;
+            const scaleH = canvas.height / state.imgBaseH;
+            return Math.min(scaleW, scaleH) * 0.95; // 画面に収まるサイズ(95%で少し余白)
+        }
+
+        function getMaxZoom() {
+            return Math.max(20.0, getMinZoom() * 50); // 元の20倍、または全体表示の50倍まで拡大可能
+        }
+
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            if (state.bgImg) {
+                const minZ = getMinZoom();
+                if (state.camera.zoom < minZ) state.camera.zoom = minZ;
+            }
             draw();
         }
         window.addEventListener('resize', resizeCanvas);
@@ -472,7 +493,9 @@
                 
                 if (state.pinch.initialDist > 0) {
                     const zoomAmount = currentDist / state.pinch.initialDist;
-                    const newZoom = Math.max(0.2, Math.min(state.pinch.initialZoom * zoomAmount, 5.0));
+                    const minZ = getMinZoom();
+                    const maxZ = getMaxZoom();
+                    const newZoom = Math.max(minZ, Math.min(state.pinch.initialZoom * zoomAmount, maxZ));
                     
                     const imgPosBefore = screenToImg(state.pinch.centerX, state.pinch.centerY);
                     state.camera.zoom = newZoom;
@@ -549,7 +572,9 @@
             const zoomAmount = e.deltaY > 0 ? 0.9 : 1.1;
             const pos = getPointerPos(e);
             const imgPosBefore = screenToImg(pos.x, pos.y);
-            state.camera.zoom = Math.max(0.2, Math.min(state.camera.zoom * zoomAmount, 5.0));
+            const minZ = getMinZoom();
+            const maxZ = getMaxZoom();
+            state.camera.zoom = Math.max(minZ, Math.min(state.camera.zoom * zoomAmount, maxZ));
             const imgPosAfter = screenToImg(pos.x, pos.y);
             state.camera.x += (imgPosBefore.x - imgPosAfter.x);
             state.camera.y += (imgPosBefore.y - imgPosAfter.y);
