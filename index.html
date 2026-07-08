@@ -226,11 +226,19 @@
 
         function parseCSV(csvText) {
             const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-            state.riddles = result.data.map(row => ({
-                id: parseInt(row.id),
-                text: row.text,
-                category: row.category, // 'none', 'frame', 'solid', 'both'
-                isFinal: row.isFinal === 'true',
+            
+            const categoryMap = {
+                '1': 'none',
+                '2': 'frame',
+                '3': 'solid',
+                '4': 'both'
+            };
+
+            state.riddles = result.data.map((row, index, arr) => ({
+                id: parseInt(row.no),
+                text: row.ans,
+                category: categoryMap[row.type] || 'none',
+                isFinal: index === arr.length - 1, // 最後の行を自動的に「最終問題」として扱う
                 solved: false
             }));
         }
