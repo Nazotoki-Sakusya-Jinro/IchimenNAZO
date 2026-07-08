@@ -621,35 +621,28 @@
                 const type = state.dragTarget.split('_')[0];
                 state.tools[type].x += dx / (state.imgBaseW * state.camera.zoom);
                 state.tools[type].y += dy / (state.imgBaseH * state.camera.zoom);
-            } else if (state.dragTarget.includes('_scale')) {
+            } else if (state.dragTarget.includes('_scale') && !state.dragTarget.startsWith('framing')) {
+                // 正方形ツールの拡大縮小（framingは除外）
                 const type = state.dragTarget.split('_')[0];
                 const center = imgToScreen(state.tools[type].x, state.tools[type].y);
                 const dist = Math.hypot(pos.x - center.x, pos.y - center.y);
                 let newPixelSize = Math.max(50, Math.min((dist * 2) / Math.SQRT2, 1000));
                 state.tools[type].size = newPixelSize / (state.imgBaseW * state.camera.zoom);
             } else if (state.dragTarget.startsWith('framing_scale_')) {
-                // 四隅のドラッグによるリサイズ処理を復活
+                // 囲み枠（四隅）の微調整
                 const dir = state.dragTarget.split('_')[2];
                 const dxImg = dx / (state.imgBaseW * state.camera.zoom);
                 const dyImg = dy / (state.imgBaseH * state.camera.zoom);
                 
                 let {x, y, w, h} = state.framedRect;
-                
-                // ドラッグ方向に応じて座標とサイズを更新
                 if (dir.includes('n')) { y += dyImg; h -= dyImg; }
                 if (dir.includes('s')) { h += dyImg; }
                 if (dir.includes('w')) { x += dxImg; w -= dxImg; }
                 if (dir.includes('e')) { w += dxImg; }
                 
-                // サイズが負になった時の反転対応（ドラッグターゲットも反転させる）
-                if (w < 0) { 
-                    x += w; w = Math.abs(w); 
-                    state.dragTarget = state.dragTarget.replace('w', 'X').replace('e', 'w').replace('X', 'e'); 
-                }
-                if (h < 0) { 
-                    y += h; h = Math.abs(h); 
-                    state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); 
-                }
+                // サイズが負になった時の反転対応
+                if (w < 0) { x += w; w = Math.abs(w); state.dragTarget = state.dragTarget.replace('w', 'X').replace('e', 'w').replace('X', 'e'); }
+                if (h < 0) { y += h; h = Math.abs(h); state.dragTarget = state.dragTarget.replace('n', 'X').replace('s', 'n').replace('X', 's'); }
                 
                 state.framedRect = {x, y, w, h};
             }
@@ -668,10 +661,13 @@
             }
 
             if (!state.pointer.active) return;
-            if (state.dragTarget && state.dragTarget.includes('_scale') && state.pointer.dragDist < 20) {
+            
+            // 正方形ツールの回転（framingは除外）
+            if (state.dragTarget && state.dragTarget.includes('_scale') && !state.dragTarget.startsWith('framing') && state.pointer.dragDist < 20) {
                 const type = state.dragTarget.split('_')[0];
                 state.tools[type].rotIdx = (state.tools[type].rotIdx + 1) % 4;
             }
+            
             if (state.dragTarget === 'framing_new') {
                 const endImgPos = screenToImg(state.pointer.currentX, state.pointer.currentY);
                 const w = Math.abs(endImgPos.x - state.pointer.startImgX);
