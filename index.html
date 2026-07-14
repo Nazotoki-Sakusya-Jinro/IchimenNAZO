@@ -3,7 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>一面謎いっぱい</title>
+    <title>一面謎</title>
+    <!-- ファビコン設定 -->
+    <link rel="icon" type="image/png" href="./data/deco/fav.png">
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PapaParse (CSV解析用) -->
@@ -125,7 +128,10 @@
     <!-- モーダル: 名前入力 -->
     <div id="modal-name" class="modal fixed inset-0 bg-black/90 z-40 flex items-center justify-center">
         <div class="bg-gray-900 border border-accent p-8 rounded-xl max-w-sm w-full text-center shadow-[0_0_15px_rgba(0,174,239,0.3)]">
-            <h2 class="text-2xl font-bold mb-6 text-accent">一面謎いっぱい</h2>
+            <!-- ロゴ画像 (失敗時はテキスト表示) -->
+            <img src="./data/deco/logo.png" alt="一面謎いっぱい" class="mx-auto mb-6 w-4/5 max-w-[250px] object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <h2 class="text-2xl font-bold mb-6 text-accent hidden">一面謎いっぱい</h2>
+            
             <p class="mb-4 text-sm text-gray-300">プレイヤー名を入力してください</p>
             <input type="text" id="input-name" class="w-full bg-black border border-gray-600 rounded px-4 py-2 mb-6 text-white focus:outline-none focus:border-accent" placeholder="名前">
             <button onclick="startGame()" class="w-full bg-accent hover:bg-accent/80 font-bold py-2 px-4 rounded transition">開始</button>
